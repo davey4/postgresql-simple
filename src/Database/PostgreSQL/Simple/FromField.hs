@@ -118,10 +118,8 @@ module Database.PostgreSQL.Simple.FromField
 
 import           Control.Applicative ( Const(Const), (<|>), (<$>), pure, (*>), (<*) )
 import           Control.Concurrent.MVar (MVar, newMVar)
-import           Control.Exception (Exception)
+import           Control.Exception (Exception (toException, fromException))
 import qualified Data.Aeson as JSON
-import qualified Data.Aeson.Internal as JSON
-import qualified Data.Aeson.Parser as JSON (value')
 import           Data.Attoparsec.ByteString.Char8 hiding (Result)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as B
@@ -156,6 +154,8 @@ import qualified Data.UUID.Types as UUID
 import           Data.Scientific (Scientific)
 import           GHC.Real (infinity, notANumber)
 
+import qualified Data.Aeson.Types as JSON
+
 -- | Exception thrown if conversion from a SQL value to a Haskell
 -- value fails.
 data ResultError = Incompatible { errSQLType :: String
@@ -182,7 +182,9 @@ data ResultError = Incompatible { errSQLType :: String
                  -- between metadata and actual data in a row).
                    deriving (Eq, Show, Typeable)
 
-instance Exception ResultError
+instance Exception ResultError where
+  toException = postgresqlExceptionToException
+  fromException = postgresqlExceptionFromException
 
 left :: Exception a => a -> Conversion b
 left = conversionError
@@ -574,7 +576,7 @@ instance FromField UUID where
 -- | json, jsonb
 instance FromField JSON.Value where
     fromField f mbs = parseBS =<< fromFieldJSONByteString f mbs
-      where parseBS bs = case parseOnly (JSON.value' <* endOfInput) bs of
+      where parseBS bs = case JSON.eitherDecodeStrict' bs of
                    Left  err -> returnError ConversionFailed f err
                    Right val -> pure val
 

@@ -55,6 +55,7 @@ import Notify
 import Serializable
 import Time
 import Interval
+import Exception (testExceptions)
 
 tests :: TestEnv -> TestTree
 tests env = testGroup "tests"
@@ -84,6 +85,7 @@ tests env = testGroup "tests"
     , testCase "2-ary generic"        . testGeneric2
     , testCase "3-ary generic"        . testGeneric3
     , testCase "Timeout"              . testTimeout
+    , testCase "Exceptions"           . testExceptions
     ]
 
 testBytea :: TestEnv -> TestTree
@@ -137,7 +139,7 @@ testFold TestEnv{..} = do
         xs <- readIORef ref
         writeIORef ref $! (a,b):xs
     xs <- readIORef ref
-    reverse xs @?= [(a,b) | a <- [1..100], b <- [1..50]]
+    reverse xs @?= [(a,b) | b <- [1..50], a <- [1..100]]
 
     -- Make sure fold propagates our exception.
     ref <- newIORef []
@@ -472,12 +474,13 @@ testCopyFailures env = testGroup "Copy failures"
 
 goldenTest :: TestName -> IO BL.ByteString -> TestTree
 goldenTest testName =
-    goldenVsString testName (resultsDir </> fileName<.>"expected")
+    goldenVsStringDiff testName diff (resultsDir </> fileName<.>"expected")
   where
     resultsDir = "test" </> "results"
     fileName = map normalize testName
     normalize c | not (isAlpha c) = '-'
                 | otherwise       = c
+    diff ref new = ["diff", "-u", ref, new]
 
 -- | Test that we provide a sensible error message on failure
 testCopyUniqueConstraintError :: TestEnv -> TestTree

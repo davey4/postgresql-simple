@@ -1,3 +1,21 @@
+### Version 0.7.0.0 (2023-07-31)
+
+  * Remove Eq Null instance. (Future `base` may break it, we remove it profilacticly).
+  * Use `postgresql-libpq >=0.10.0.0`. It includes critical fixes,
+    by using `postgresql-simple >=0.7` you won't get older `postgresql-libpq`.
+  * Drop support for GHC prior 8.6
+  * Added a class for `postgresql-simple` exceptions: `SomePostgreSqlException`.
+    This allows to catch all `postgresql-simple` exceptions at once.
+    (c.f. `AsyncException` in `base).
+
+### Version 0.6.5.1 (2023-07-09)
+
+  * Support `aeson-2.2.0.0`
+
+### Version 0.6.5 (2022-10-30)
+
+  * Add `withConnect`
+
 ### Version 0.6.4 (2021-01-06)
 
   * Add foldCopyData helper function

@@ -1,6 +1,8 @@
 {-# LANGUAGE  CPP, BangPatterns, DoAndIfThenElse, RecordWildCards  #-}
 {-# LANGUAGE  DeriveDataTypeable, DeriveGeneric                    #-}
 {-# LANGUAGE  GeneralizedNewtypeDeriving                           #-}
+{-# LANGUAGE  ExistentialQuantification                            #-}
+{-# LANGUAGE  InstanceSigs                                         #-}
 
 ------------------------------------------------------------------------------
 -- |
@@ -34,7 +36,6 @@ import           Data.Int (Int64)
 import qualified Data.IntMap as IntMap
 import           Data.IORef
 import           Data.Maybe(fromMaybe)
-import           Data.Monoid
 import           Data.String
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -82,6 +83,25 @@ data Connection = Connection {
 instance Eq Connection where
    x == y = connectionHandle x == connectionHandle y
 
+-- | Superclass for postgresql exceptions
+data SomePostgreSqlException = forall e. Exception e => SomePostgreSqlException e
+  deriving Typeable
+
+postgresqlExceptionToException :: Exception e => e -> SomeException
+postgresqlExceptionToException = toException . SomePostgreSqlException
+
+postgresqlExceptionFromException :: Exception e => SomeException -> Maybe e
+postgresqlExceptionFromException x = do
+  SomePostgreSqlException a <- fromException x
+  cast a
+
+instance Show SomePostgreSqlException where
+  showsPrec :: Int -> SomePostgreSqlException -> ShowS
+  showsPrec p (SomePostgreSqlException e) = showsPrec p e
+
+instance Exception SomePostgreSqlException where
+  displayException (SomePostgreSqlException e) = displayException e
+
 data SqlError = SqlError {
      sqlState       :: ByteString
    , sqlExecStatus  :: ExecStatus
@@ -93,7 +113,10 @@ data SqlError = SqlError {
 fatalError :: ByteString -> SqlError
 fatalError msg = SqlError "" FatalError msg "" ""
 
-instance Exception SqlError
+instance Exception SqlError where
+  toException = postgresqlExceptionToException
+  fromException = postgresqlExceptionFromException
+
 
 -- | Exception thrown if 'query' is used to perform an @INSERT@-like
 -- operation, or 'execute' is used to perform a @SELECT@-like operation.
@@ -102,7 +125,9 @@ data QueryError = QueryError {
     , qeQuery :: Query
     } deriving (Eq, Show, Typeable)
 
-instance Exception QueryError
+instance Exception QueryError where
+  toException = postgresqlExceptionToException
+  fromException = postgresqlExceptionFromException
 
 -- | Exception thrown if a 'Query' could not be formatted correctly.
 -- This may occur if the number of \'@?@\' characters in the query
@@ -113,7 +138,9 @@ data FormatError = FormatError {
     , fmtParams :: [ByteString]
     } deriving (Eq, Show, Typeable)
 
-instance Exception FormatError
+instance Exception FormatError where
+  toException = postgresqlExceptionToException
+  fromException = postgresqlExceptionFromException
 
 data ConnectInfo = ConnectInfo {
       connectHost :: String
@@ -156,6 +183,8 @@ connect :: ConnectInfo -> IO Connection
 connect = connectPostgreSQL . postgreSQLConnectionString
 
 -- | Memory bracket around 'connect' and 'close'.
+--
+-- @since 0.6.5
 withConnect :: ConnectInfo -> (Connection -> IO c) -> IO c
 withConnect connInfo = bracket (connect connInfo) close
 
@@ -524,9 +553,6 @@ instance Alternative Conversion where
                      Errors _ -> (oka <|>) <$> runConversion mb conn
 
 instance Monad Conversion where
-#if !(MIN_VERSION_base(4,8,0))
-   return = pure
-#endif
    m >>= f = Conversion $ \conn -> do
                  oka <- runConversion m conn
                  case oka of

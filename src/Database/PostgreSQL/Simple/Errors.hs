@@ -25,7 +25,6 @@ module Database.PostgreSQL.Simple.Errors
        )
        where
 
-import Control.Applicative
 import Control.Exception as E
 
 import Data.Attoparsec.ByteString.Char8
@@ -60,7 +59,9 @@ data ConstraintViolation
    deriving (Show, Eq, Ord, Typeable)
 
 -- Default instance should be enough
-instance Exception ConstraintViolation
+instance Exception ConstraintViolation where
+  toException = postgresqlExceptionToException
+  fromException = postgresqlExceptionFromException
 
 
 -- | Tries to convert 'SqlError' to 'ConstrainViolation', checks sqlState and

@@ -50,10 +50,6 @@ import           Database.PostgreSQL.Simple.Compat (toByteString)
 data Null = Null
           deriving (Read, Show, Typeable)
 
-instance Eq Null where
-    _ == _ = False
-    _ /= _ = False
-
 -- | A placeholder for the PostgreSQL @DEFAULT@ value.
 data Default = Default
            deriving (Read, Show, Typeable)
@@ -97,9 +93,6 @@ instance Semigroup Query where
 
 instance Monoid Query where
     mempty = Query B.empty
-#if !(MIN_VERSION_base(4,11,0))
-    mappend = (<>)
-#endif
 
 -- | Wrap a list of values for use in an @IN@ clause.  Replaces a
 -- single \"@?@\" character with a parenthesized list of rendered
